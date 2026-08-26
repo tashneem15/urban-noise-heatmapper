@@ -1,0 +1,319 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Urban Noise Pollution Heatmapper: A Low-Cost, Dual-Microphone IoT System for Confidence-Aware Urban Noise Mapping}
+
+\author{
+\IEEEauthorblockN{Sumaiya Rahman}
+\IEEEauthorblockA{
+\textit{Dept. of Computer Science Engineering}\\
+\textit{Independent University, Bangladesh}\\
+Dhaka, Bangladesh\\
+2312187@iub.edu.bd}
+\and
+\IEEEauthorblockN{A.B.M Saeduzzaman}
+\IEEEauthorblockA{
+\textit{Dept. of Computer Science Engineering}\\
+\textit{Independent University, Bangladesh}\\
+Dhaka, Bangladesh\\
+2310826@iub.edu.bd}
+\and
+\IEEEauthorblockN{Tashneem Khan}
+\IEEEauthorblockA{
+\textit{Dept. of Computer Science Engineering}\\
+\textit{Independent University, Bangladesh}\\
+Dhaka, Bangladesh\\
+2430962@iub.edu.bd}
+\and
+\IEEEauthorblockN{Saif Hossain Jibon}
+\IEEEauthorblockA{
+\textit{Dept. of Computer Science Engineering}\\
+\textit{Independent University, Bangladesh}\\
+Dhaka, Bangladesh\\
+2031035@iub.edu.bd}
+\and
+\IEEEauthorblockN{Tammem Ibne Tozammel}
+\IEEEauthorblockA{
+\textit{Dept. of Computer Science Engineering}\\
+\textit{Independent University, Bangladesh}\\
+Dhaka, Bangladesh\\
+2220739@iub.edu.bd}
+
+
+}
+
+\maketitle
+
+\begin{abstract}
+Urban noise pollution has emerged as one of the most overlooked environmental health hazards in rapidly growing cities, contributing to hearing impairment, cardiovascular stress, and reduced quality of life. Conventional noise assessment methods rely either on expensive Class 1/2 sound level meters coupled with GIS interpolation software, or on crowd-sourced smartphone applications that lack measurement confidence and cross-validation. This paper presents the design and development of an Urban Noise Pollution Heatmapper, a low-cost, dual-microphone IoT-based acoustic monitoring device built around the ESP32-S3 microcontroller. The proposed system combines an INMP441 I2S MEMS microphone with a PDM MEMS microphone to enable dual-channel acoustic validation, on-device computation of the equivalent continuous sound level (LAeq), peak sound level (Lmax), an intermittency ratio, and a measurement-confidence score, before transmitting the processed summaries over Wi-Fi to a cloud back end. The server performs spatial interpolation on the aggregated readings to generate an interactive, confidence-aware noise heatmap accessible through a web dashboard and a mobile application. Built at an approximate per-unit cost of BDT 3,059, the proposed prototype offers a favourable balance between affordability, measurement reliability, and scalability when compared with existing single-microphone IoT sensors and professional sound level meters. The system is intended to help urban planners, researchers, and citizens identify noise hotspots and formulate evidence-based noise-mitigation strategies, particularly in resource-constrained urban environments such as Dhaka, Bangladesh.
+\end{abstract}
+
+\renewcommand\IEEEkeywordsname{Keywords}
+\begin{IEEEkeywords}
+urban noise pollution, noise heatmap, Internet of Things, ESP32-S3, MEMS microphone, edge computing, environmental monitoring
+\end{IEEEkeywords}
+
+\section{Introduction}
+Noise has quietly become one of the defining pollutants of contemporary urban life. Unlike air or water pollution, its effects are transient and largely invisible, yet cumulative exposure has been linked to hypertension, sleep disturbance, and elevated stress hormones. The World Health Organization recommends that long-term environmental noise exposure be kept below roughly 55 dB during the day to safeguard cardiovascular and psychological health \cite{b1}; field studies conducted across cities as varied as Astana \cite{b2}, Milan \cite{b3}, and Dhaka \cite{b4} nonetheless report average noise levels well above this threshold, frequently exceeding 80 dB along major traffic corridors.
+
+Dhaka, the capital of Bangladesh, illustrates this challenge clearly. A recent survey of central locations across Dhaka North and Dhaka South City Corporations, conducted with a calibrated sound level meter during peak traffic hours, found that every monitored location exceeded permissible sound limits, with several intersections in areas such as Gulistan, Farmgate, and Kawran Bazar registering critically high readings \cite{b4}. Despite the scale of the problem, continuously updated, city-wide noise maps remain rare, largely because professional sound level meters paired with GIS interpolation software are too expensive to deploy and maintain at scale \cite{b2}.
+
+An alternative explored in the literature is participatory, smartphone-based noise sensing \cite{b5}, which lowers cost but introduces its own limitations. Built-in phone microphones vary considerably in frequency response, calibration is rarely consistent across devices, and a single microphone channel offers no internal mechanism to flag an unreliable reading, so an occluded or noisy sample cannot be distinguished from a genuine noise event. Dedicated low-power wireless sensor networks improve consistency \cite{b6} but are typically built around one microphone channel and seldom report a quantitative confidence value alongside each measurement.
+
+This project addresses these gaps with the Urban Noise Pollution Heatmapper, a compact, dual-microphone acoustic sensing device built on the ESP32-S3 microcontroller. By combining two independent MEMS microphones -- an I2S digital microphone and a PDM digital microphone -- the device cross-checks every reading before it is logged, which allows a numeric confidence score to be attached to each data point. Alongside the conventional equivalent continuous sound level (LAeq) and peak sound level (Lmax), the device also computes an intermittency ratio, a metric shown in recent acoustics literature to better reflect the perceptual annoyance of episodic events such as horns and sirens, which a simple energy-averaged LAeq value tends to mask \cite{b3}. Processed summaries, rather than raw audio, are transmitted over Wi-Fi to a cloud server, which limits the communication payload and avoids storing identifiable audio of bystanders. The server performs spatial interpolation on the incoming readings to generate an interactive, confidence-aware heatmap, hotspot alerts, and historical trend views through a companion web and mobile application.
+
+The remainder of this paper is organized as follows. Section II reviews recent literature on urban noise mapping, spanning GIS-based spatial surveys, smartphone crowd-sensing, dedicated sensor networks, and machine-learning-assisted noise assessment. Section III formalizes the problem statement. Section IV describes the proposed system architecture, hardware design, and processing pipeline. Section V presents a comparative cost and feature analysis. Section VI discusses the practical challenges encountered during development, and Section VII concludes the paper with directions for future work.
+
+\section{Literature Review}
+
+\subsection{GIS-Based Spatial Noise Mapping}
+Geographic Information System (GIS) interpolation remains the dominant technique for turning discrete sound level measurements into continuous noise maps. In Astana, Kazakhstan, researchers combined 840 measurements collected at 20 fixed stations over a one-month period with a calibrated sound level meter and a mobile sound-meter application, reporting an average city-wide noise level of 73 dB and discrepancies of up to 6.86 dB between the two measurement instruments \cite{b2}. This finding is significant for the present work because it demonstrates both the feasibility of combining a reference-grade meter with a lower-cost sensing device, and the need to quantify, rather than ignore, the disagreement between instruments -- precisely the motivation behind the dual-microphone confidence score proposed in this paper. A related study in Thessaloniki used a similarly interpolated noise surface to show a statistically measurable negative relationship between residential proximity to high-noise zones and housing prices, underscoring the downstream economic relevance of accurate noise maps \cite{b7}. While effective, these GIS-based surveys share a common limitation: they are episodic snapshots rather than continuously updated feeds, since the instrumentation and staff time required for city-wide sampling campaigns cannot easily be repeated at short intervals.
+
+\subsection{Smartphone-Based and Crowd-Sourced Sensing}
+To reduce the cost of large-scale noise monitoring, several studies have explored participatory sensing using ordinary smartphones. A widely cited approach proposed a Region-based Noise Mapping Method (RNMM) that pairs each phone with an external calibrated microphone to reduce wind and handling noise, then applies Ordinary Kriging interpolation separately within different land-use regions to account for spatial heterogeneity in sound propagation \cite{b5}. The study reported that this region-aware interpolation produced noise distributions more consistent with ground truth than a single global interpolation model. This body of work confirms that a single, uncalibrated microphone channel is a persistent weak point in smartphone-based noise sensing -- a limitation the current project addresses directly by pairing two independently sourced MEMS microphones on the same device rather than relying on post-hoc statistical correction. Closer to home, a 2023 survey of sound levels across Dhaka North and South City Corporations used a Lutron SL-4012 sound level meter at fifteen locations in each corporation during peak traffic hours and found that every single location exceeded recommended thresholds, with the authors explicitly recommending device-based, continuous monitoring with public-facing displays as a mitigation strategy \cite{b4} -- a recommendation this project directly responds to.
+
+\subsection{Dedicated IoT and Wireless Sensor Networks}
+Purpose-built low-power sensor networks trade the flexibility of crowd-sourcing for measurement consistency. Recent work on LoRaWAN-based dynamic noise mapping combined distributed low-power acoustic nodes with machine-learning models to both estimate sound levels and support enforcement of municipal noise ordinances, demonstrating that dedicated hardware nodes can achieve wide-area coverage at a fraction of the cost of a professional sound level meter network \cite{b8}. Similarly, an open dataset of ambient sound recordings collected across urban Uganda used low-cost embedded recorders to build one of the first large-scale acoustic datasets for a Sub-Saharan African city, illustrating that embedded acoustic sensing is a practical option even in infrastructure-constrained settings \cite{b9}. These deployments, however, typically report a single averaged sound level per interval and do not attempt to validate one microphone reading against another, nor do they expose a per-reading confidence value to downstream applications -- both of which are central design goals of the Urban Noise Pollution Heatmapper.
+
+\subsection{Event-Aware and Machine-Learning-Assisted Noise Assessment}
+A simple energy-averaged LAeq value can obscure how noise is actually perceived: two locations with an identical LAeq may differ sharply in perceived annoyance if one experiences a few very loud pass-by events and the other a steady hum. To capture this, Brambilla et al. introduced and validated the intermittency ratio (IR) metric on a 24-hour dataset collected at 90 sites across Milan, showing that clustering sites by their IR temporal pattern, in addition to their LAeq, produced a more perceptually meaningful classification of urban roads than LAeq alone \cite{b3}. This project adopts the same underlying principle, computing an on-device intermittency ratio alongside LAeq so that the resulting heatmap can distinguish a steadily busy street from an intermittently loud one. On the perceptual side, Ma et al. proposed psychoacoustic heatmap machine-learning models (PHMLM) that convert time-varying psychoacoustic metrics into an image-like representation and use deep learning to predict subjective noise-impact ratings such as annoyance and discomfort, achieving correlation coefficients of up to 0.80 against jury listening tests \cite{b10}. Complementing this, Zarei et al. proposed an open-GIS acoustic comfort map for Montreal that fuses objective sound-level data with citizen-reported comfort scores, demonstrating that combining sensor data with a subjective layer improves the practical usefulness of a noise map for planners \cite{b11}. Together, these studies motivate the inclusion of an intermittency ratio and a measurement-confidence score in the proposed system, rather than a bare LAeq value, so that the resulting heatmap conveys not just how loud a location is, but how that loudness is likely to be experienced and how much the reading can be trusted.
+
+\subsection{Summary of Research Gaps}
+Across the reviewed literature, three recurring gaps motivate the present work. First, GIS-based professional surveys are accurate but episodic, not continuous \cite{b2}\cite{b7}. Second, smartphone-based crowd-sensing lowers cost but lacks a built-in reliability check, since a single microphone channel cannot flag its own anomalies \cite{b5}\cite{b4}. Third, dedicated IoT sensor networks improve consistency but generally report a single averaged level without an event-aware metric or an explicit confidence score \cite{b8}\cite{b9}. The Urban Noise Pollution Heatmapper is designed to close all three gaps simultaneously within a single low-cost, battery-powered device.
+
+\section{Problem Statement}
+Despite growing recognition of noise as a public-health hazard, three structural gaps persist in existing noise-monitoring solutions. First, GIS-based professional surveys, such as those conducted with calibrated sound level meters \cite{b2}\cite{b4}, produce accurate spatial noise maps but are episodic rather than continuous, since equipment cost and staffing constraints make sustained deployment impractical on a city-wide budget. Second, smartphone-based crowd-sourced sensing \cite{b5} reduces cost but sacrifices reliability: built-in microphones differ in sensitivity, individual calibration is rarely performed at scale, and a single microphone channel provides no internal cross-check, so an anomalous or occluded reading cannot be distinguished from a genuine noise event. Third, existing dedicated IoT noise sensors \cite{b8}\cite{b9} typically transmit one averaged sound level per interval; the temporal structure of the underlying noise -- for example, whether a location's average level of 65 dB arises from a steady hum or from occasional 90 dB horn blasts -- is lost, even though this distinction strongly affects how the noise is perceived \cite{b3}.
+
+For a city such as Dhaka, where noise levels routinely exceed safe limits at major intersections \cite{b4} yet no continuously updated public noise map exists, these gaps are especially consequential. The Urban Noise Pollution Heatmapper is therefore designed to answer the following question: can a low-cost, dual-microphone embedded device provide continuously updated, confidence-scored, and event-aware noise measurements that are affordable enough for distributed deployment across a city, while preserving citizen privacy by processing audio locally rather than transmitting raw recordings?
+
+\section{Methodology}
+
+\subsection{System Overview}
+The proposed system is organized into four cooperating layers, illustrated in Fig.~\ref{fig:architecture}: (1) Field Data Collection, in which a handheld Noise Monitoring Unit records ambient sound together with a location tag obtained from a paired smartphone's GPS; (2) Edge Processing and Communication, in which the ESP32-S3 microcontroller extracts acoustic features, applies privacy-preserving on-device processing, and estimates a measurement confidence value before transmitting the result over Wi-Fi; (3) the Cloud and Server Layer, which stores incoming readings in a database, cleans the data, performs spatial interpolation, and generates heatmaps; and (4) the User Application layer, comprising a web dashboard and a mobile application through which researchers and citizens view the resulting noise heatmap, a confidence map, and hotspot alerts.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.48\textwidth]{images/system_architecture.png}}
+\caption{System architecture of the proposed Urban Noise Pollution Heatmapper, showing the field-collection, edge-processing, cloud, and application layers.}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{Hardware Design}
+The Noise Monitoring Unit is built around an ESP32-S3-WROOM-1 development board with dual Type-C USB ports, 16 MB of flash memory, and 8 MB of PSRAM. Its dual-core processor and built-in Wi-Fi radio make it well suited to running feature-extraction routines locally while still handling wireless data upload. Two independent microphones are attached to this board to enable dual-channel validation:
+
+\begin{itemize}
+\item An \textbf{INMP441} omnidirectional MEMS microphone, which outputs a 24-bit digital signal over the I2S protocol and serves as the primary acoustic channel because of its flat, wideband frequency response.
+\item A \textbf{PDM MEMS microphone} breakout module, which streams a 1-bit pulse-density-modulated digital audio signal directly to the microcontroller, avoiding the electromagnetic interference associated with an analog front end, and serves as the secondary validation channel.
+\end{itemize}
+
+Power is supplied by a 3.7 V, 1200 mAh lithium-polymer battery, regulated and recharged through a compact Type-C charging module with over-charge and over-discharge protection, allowing the unit to operate untethered during field data collection. Table~\ref{tab:components} lists the core components together with their approximate retail price in Bangladesh. The complete wiring of the microphones, microcontroller, battery, and charging module is shown in Fig.~\ref{fig:circuit}.
+
+\begin{table}[htbp]
+\caption{Core Hardware Components and Unit Cost}
+\label{tab:components}
+\begin{center}
+\begin{tabular}{|p{2.3cm}|p{3.6cm}|p{1.0cm}|}
+\hline
+\textbf{Component} & \textbf{Role in the System} & \textbf{Price (BDT)} \\
+\hline
+INMP441 I2S MEMS microphone & Primary acoustic sensing channel & 730 \\
+\hline
+PDM MEMS microphone module & Secondary validation channel & 750 \\
+\hline
+ESP32-S3-WROOM-1 (N16R8) & Edge processing and Wi-Fi upload & 889 \\
+\hline
+3.7 V, 1200 mAh LiPo battery & Portable power supply & 640 \\
+\hline
+Type-C LiPo charger/protection module & Battery charging and protection & 50 \\
+\hline
+\textbf{Total (per unit)} & & \textbf{3,059} \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.48\textwidth]{images/circuit_diagram.png}}
+\caption{Circuit diagram of the Noise Monitoring Unit showing the wiring between the ESP32-S3 board, the INMP441 and PDM microphones, the LiPo battery, and the Type-C charging module.}
+\label{fig:circuit}
+\end{figure}
+
+\subsection{Edge Processing Pipeline}
+As summarized in Fig.~\ref{fig:block}, the raw digital audio streams from both microphones are processed locally on the ESP32-S3 before any data leaves the device. The pipeline consists of five stages:
+
+\begin{enumerate}
+\item \textbf{Noise Estimation:} both microphone streams are converted into A-weighted sound pressure level values over a rolling measurement window.
+\item \textbf{Peak/Event Detection:} short-duration samples exceeding a locally adaptive threshold are flagged as discrete noise events (e.g., horns, sirens, construction impacts).
+\item \textbf{Intermittency Analysis:} the proportion of total acoustic energy contributed by flagged events is used to compute an intermittency ratio for the measurement window.
+\item \textbf{Dual-Mic Comparison:} the INMP441 and PDM readings are compared; large, unexplained disagreement between the two channels indicates a possible obstruction, wind artefact, or sensor fault.
+\item \textbf{Confidence Calculation:} the outcome of the dual-microphone comparison is combined with signal quality indicators to produce a single confidence score for the measurement window.
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.48\textwidth]{images/block_diagram.png}}
+\caption{Block diagram of the sensing, edge-processing, output, and application stages of the proposed system.}
+\label{fig:block}
+\end{figure}
+
+\subsection{Acoustic Metrics}
+The equivalent continuous A-weighted sound pressure level over a measurement interval $T$ is computed using the standard definition
+\begin{equation}
+L_{Aeq,T} = 10\log_{10}\left(\frac{1}{T}\int_{0}^{T}\left(\frac{p_A(t)}{p_0}\right)^{2}dt\right),
+\label{eq:laeq}
+\end{equation}
+where $p_A(t)$ is the instantaneous A-weighted sound pressure and $p_0 = 20\ \mu\text{Pa}$ is the reference pressure. Samples whose instantaneous level exceeds a threshold $K = L_{Aeq,T} + 3\ \text{dB}$ are treated as contributing to a discrete noise event, following the event-detection convention validated for road-traffic noise classification \cite{b3}. The intermittency ratio for a window is then
+\begin{equation}
+IR = \frac{E_{\text{event}}}{E_{\text{total}}}\times 100\%,
+\label{eq:ir}
+\end{equation}
+where $E_{\text{event}}$ is the summed acoustic energy of samples above $K$ and $E_{\text{total}}$ is the total acoustic energy in the window. Finally, the measurement-confidence score for a window is computed from the absolute disagreement between the two microphone channels,
+\begin{equation}
+C = \max\left(0,\ 100 - \alpha\left|L_{Aeq}^{\text{I2S}} - L_{Aeq}^{\text{PDM}}\right|\right),
+\label{eq:conf}
+\end{equation}
+where $\alpha$ is a scaling constant tuned so that a 1 dB disagreement between channels corresponds to a modest confidence penalty, while disagreements above a few decibels sharply reduce the reported confidence.
+
+\subsection{Cloud, Interpolation, and Application Layer}
+Once a measurement window closes, the device transmits a compact JSON payload containing $L_{Aeq}$, $L_{max}$, $IR$, $C$, a timestamp, and the paired GPS coordinate over Wi-Fi to the cloud server. The server layer performs three functions: it cleans incoming records (discarding or down-weighting low-confidence readings), applies spatial interpolation across all recent readings in a neighbourhood to fill gaps between sampled points, and aggregates the interpolated surface into a noise-burden score used to rank hotspots. The resulting heatmap, confidence layer, and hotspot alerts are exposed through a web dashboard and a companion mobile application, allowing a researcher or citizen to filter the map by time of day, minimum confidence, or intermittency ratio.
+
+\section{Result Analysis}
+
+\subsection{Cost Analysis}
+As summarized in Table~\ref{tab:components}, the complete Noise Monitoring Unit was assembled at a total component cost of approximately BDT 3,059 per unit, or roughly BDT 612 when the cost is amortized across the five members of the project team who each contributed toward a shared prototype budget. This places the device well within the cost range of a single consumer smartphone accessory and an order of magnitude below the cost of a Class 1/2 professional sound level meter, supporting the goal of distributed, multi-point deployment across a city rather than a handful of fixed, expensive stations.
+
+\subsection{Comparative Feature Analysis}
+Table~\ref{tab:comparison} compares the proposed system against the two dominant alternative approaches identified in the literature review: GIS-based professional surveys using a calibrated sound level meter \cite{b2}\cite{b4}, and single-microphone smartphone or IoT-based crowd-sensing \cite{b5}\cite{b8}\cite{b9}. The proposed dual-microphone design is the only one of the three that produces a quantitative, per-reading confidence score and an intermittency ratio without relying on a second, independently operated reference instrument.
+
+% \begin{table}[htbp]
+% \caption{Comparison of Noise Monitoring Approaches}
+% \label{tab:comparison}
+% \begin{center}
+% \small
+% \begin{tabular}{|p{1.7cm}|p{1.6cm}|p{1.6cm}|p{1.6cm}|}
+% \hline
+% \textbf{Criterion} & \textbf{GIS + SLM Survey} & \textbf{Single-Mic Crowd-Sensing} & \textbf{Proposed System} \\
+% \hline
+% Relative cost & Very high & Low & Low \\
+% \hline
+% Deployment continuity & Episodic & Continuous & Continuous \\
+% \hline
+% Per-reading confidence score & Not reported & Not reported & Reported \\
+% \hline
+% Event \& intermittency awareness & Manual post-processing & Rarely reported & On-device \\
+% \hline
+% Raw-audio privacy exposure & N/A & Often high & Minimized (edge processed) \\
+% \hline
+% \end{tabular}
+% \end{center}
+% \end{table}
+\begin{table}[htbp]
+\caption{Comparison of Noise Monitoring Approaches}
+\label{tab:comparison}
+\begin{center}
+\scriptsize
+\begin{tabular}{|p{1.35cm}|p{1.55cm}|p{1.55cm}|p{1.55cm}|p{1.55cm}|}
+\hline
+\textbf{Feature} &
+\textbf{Proposed Dual-Microphone ESP32-S3 Device} &
+\textbf{Smartphone-Based Noise Mapping} &
+\textbf{Single-Microphone IoT Noise Sensor} &
+\textbf{Professional Sound-Level Meter with GIS} \\
+\hline
+
+\textbf{Approximate Cost} &
+3,059 TK per prototype &
+Low if an existing phone is used &
+Low to moderate &
+High \\
+\hline
+
+\textbf{Latency} &
+Moderate &
+Low to moderate &
+Low to moderate &
+Moderate \\
+\hline
+
+\textbf{Remote Monitoring via Mobile App} &
+Yes. Proposed &
+Yes &
+Possible &
+Limited or software-dependent \\
+\hline
+
+\textbf{Scalable} &
+Yes. Additional units can be deployed &
+High through crowd sourcing &
+High through multiple nodes &
+Limited by equipment cost \\
+\hline
+
+\textbf{Suitable for Industries} &
+Yes. For research and non-regulatory monitoring &
+Limited &
+Yes for non-regulatory monitoring &
+Yes \\
+\hline
+
+\textbf{Suitable for Households} &
+Yes &
+Yes &
+Yes &
+Limited because of cost \\
+\hline
+
+\textbf{Ease of Installation} &
+Easy &
+Easy &
+Moderate &
+Moderate \\
+\hline
+
+\end{tabular}
+\end{center}
+\end{table}
+\subsection{Sustainability Discussion}
+From an \textbf{economic} standpoint, the roughly BDT 3,059 per-unit cost makes it realistic to deploy several dozen units across a city district for the price of a single professional sound level meter, enabling denser spatial coverage than episodic GIS surveys can achieve. From an \textbf{environmental} standpoint, the battery-powered, rechargeable design avoids the continuous mains-power draw of fixed monitoring stations and, being reusable across measurement locations, reduces the electronic waste associated with disposable sensing campaigns. From a \textbf{social} standpoint, the resulting public heatmap raises citizen awareness of local noise exposure, supports evidence-based enforcement of noise ordinances, and, by processing audio into summary statistics on-device rather than transmitting raw recordings, limits the privacy risk to bystanders who are inadvertently within a device's pickup range -- an ethical consideration that is largely absent from prior smartphone crowd-sensing designs \cite{b5}.
+
+\section{Challenges Faced}
+Several practical challenges were encountered while developing the prototype and are documented here for the benefit of future iterations of this project.
+
+\subsection{Hardware Integration Challenges}
+Synchronizing two microphones that use different digital audio protocols -- I2S for the INMP441 and PDM for the second microphone -- on a single ESP32-S3 required careful configuration of the microcontroller's audio peripherals to sample both channels within the same measurement window without introducing timing drift between them. Sourcing MEMS microphone breakout boards and a compact protected LiPo charging module locally in Bangladesh also proved time-consuming, occasionally requiring substitution of listed components with functionally equivalent parts from local suppliers.
+
+\subsection{Calibration and Signal Processing Challenges}
+Neither MEMS microphone ships pre-calibrated to an absolute sound-pressure reference, so establishing a reliable mapping from raw digital samples to dB(A) values required repeated comparison against a reference sound level meter across a range of sound levels. Choosing an event-detection threshold that reliably separated genuine noise events (horn honks, construction impacts) from ordinary traffic hum, without being so sensitive that wind noise or handling vibration were misclassified as events, required several rounds of empirical tuning of the threshold used in the intermittency-ratio calculation.
+
+\subsection{Connectivity and Deployment Challenges}
+Maintaining a stable Wi-Fi connection for periodic data upload while the device operated on battery power in outdoor field locations, some with weak signal coverage, required implementing local buffering of measurement windows so that no readings were lost during brief connectivity interruptions.
+
+\subsection{Project and Resource Constraints}
+Coordinating a five-member team, planning the work breakdown structure, and defining realistic start and due dates for hardware assembly, firmware development, and the cloud/application layer in a Gantt chart proved more difficult than anticipated once component lead times were taken into account. Component costs and shipping timelines were also less predictable than expected, occasionally requiring the team to adjust the bill of materials within the available project budget.
+
+\section{Conclusion}
+This paper presented the Urban Noise Pollution Heatmapper, a low-cost, dual-microphone IoT device designed to close three persistent gaps in existing urban noise-monitoring approaches: the episodic nature of GIS-based professional surveys, the lack of a built-in reliability check in single-microphone crowd-sensing, and the absence of an event-aware metric in existing dedicated sensor networks. By pairing an INMP441 I2S microphone with a PDM microphone on an ESP32-S3 platform, the proposed device computes LAeq, Lmax, an intermittency ratio, and a per-reading confidence score entirely at the edge, before transmitting only compact summary data to a cloud server that generates an interactive, confidence-aware noise heatmap. At an approximate per-unit cost of BDT 3,059, the system is inexpensive enough for distributed, multi-point deployment across a city while addressing the privacy and reliability shortcomings identified in the reviewed literature. Future work will focus on field-validating the device's dual-microphone confidence score against a certified Class 1 sound level meter across a wider range of sound levels, extending the intermittency-based event classifier to distinguish between common urban noise sources (traffic, construction, sirens), and piloting a multi-unit deployment across several neighbourhoods of Dhaka to produce the first continuously updated, citizen-facing noise heatmap for the city.
+
+\begin{thebibliography}{00}
+\bibitem{b1} World Health Organization, ``Burden of disease from environmental noise: Quantification of healthy life years lost in Europe,'' WHO Regional Office for Europe, Copenhagen, Denmark, 2011.
+\bibitem{b2} G. Ormanova, D. Yedilkhan, M. Orazbay, U. Dyussengazina, and A. Yermekov, ``The geospatial distribution and mapping of urban noise pollution in Astana city,'' \textit{Journal of the Air \& Waste Management Association} (SAGE), 2026, doi: 10.1177/09574565261442250.
+\bibitem{b3} G. Brambilla, C. Confalonieri, and R. Benocci, ``Application of the intermittency ratio metric for the classification of urban sites based on road traffic noise events,'' \textit{Sensors}, vol. 19, no. 23, p. 5136, 2019, doi: 10.3390/s19235136.
+\bibitem{b4} A. I. Rafi, M. M. Hossain, \textit{et al.}, ``Sound pollution monitoring system and awareness creation in modern cities: A case study,'' in \textit{Proc. 2023 Int. Conf. on Advances in Electronics, Communication, Computing and Intelligent Information Systems (ICAECIS)}, IEEE, 2023.
+\bibitem{b5} J. Zuo, H. Xia, S. Liu, and Y. Qiao, ``Mapping urban environmental noise using smartphones,'' \textit{Sensors}, vol. 16, no. 10, p. 1692, 2016, doi: 10.3390/s16101692.
+\bibitem{b6} S. Santini, B. Ostermaier, and A. Vitaletti, ``First experiences using wireless sensor networks for noise pollution monitoring,'' in \textit{Proc. 3rd ACM Int. Workshop on Wireless Network Testbeds, Experimental Evaluation and Characterization (WiNTECH)}, 2008.
+\bibitem{b7} G. Kamtziridis, D. Vrakas, and G. Tsoumakas, ``Does noise affect housing prices? A case study in the urban area of Thessaloniki,'' \textit{EPJ Data Science}, vol. 12, no. 1, p. 50, 2023, doi: 10.1140/epjds/s13688-023-00423-5.
+\bibitem{b8} H. E. Erdem and H. Leung, ``LoRaWAN based dynamic noise mapping with machine learning for urban noise enforcement,'' \textit{arXiv preprint arXiv:2407.21204}, 2024.
+\bibitem{b9} S. Nsumba, T. Muhanguzi, E. N. Ouma, I. Sekalala, E. Bainomugisha, E. Mwebaze, and J. Quinn, ``Noise mapping and ambient sound recordings of the urban environment in Uganda,'' \textit{Scientific Data}, vol. 13, p. 345, 2026, doi: 10.1038/s41597-026-06658-w.
+\bibitem{b10} K. W. Ma, C. M. Mak, F.-L. Chung, and H. M. G. Wong, ``Advanced acoustic monitoring using psychoacoustic heatmap machine learning models for noise impact prediction in air-conditioned building environments,'' \textit{Sensors}, vol. 26, no. 2, p. 544, 2026, doi: 10.3390/s26020544.
+\bibitem{b11} F. Zarei, M. Nik-Bakht, J. Lee, and F. Zarei, ``Urban-scale acoustic comfort map: Fusion of social inputs, noise levels, and citizen comfort in open GIS,'' \textit{Processes}, vol. 12, no. 12, p. 2864, 2024, doi: 10.3390/pr12122864.
+\end{thebibliography}
+\end{document}
