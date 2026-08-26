@@ -1,4 +1,4 @@
-# urban-noise-pollution-heatmapper
+# urban-noise-heatmapper
 
 A low-cost, dual-microphone IoT device (ESP32-S3) that measures the noise pollution with a built-in confidence score, generating a real-time noise heatmap accessible via web and mobile. Built using the ESP32-S3 microcontroller with an INMP441 and a PDM MEMS microphone. The device cross checks its own readings to calculate a noise level (LAeq), peak level (Lmax), intermittency ratio and finally a confidence score; all processed on the device before being sent to a cloud server for spatial interpolation and heatmap generation.
 
